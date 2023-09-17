@@ -96,7 +96,7 @@ simulation.inference <- function(B, seed = 1234, rh = 0.2, bh = 0.1) {
         for (i in 1:length(quants)) {
             qq <- quants[[i]]
             results[[i]] <- t(sapply(ts, FUN = function(x) {
-                return(est_nr(dat, x, tau = qq, rho = rh, bandwidth = bh)$q)
+                return(estimate.quantile(dat, x, tau = qq, rho = rh, bandwidth = bh)$q)   # can replace with estimate2.quantile also
             }))
         }
         
@@ -175,7 +175,7 @@ simulation.prediction <- function(B, seed = 1234, rh = 0.2, bh = 0.1) {
         for (i in 1:length(quants)) {
             qq <- quants[[i]]
             results[[i]] <- t(sapply(ts, FUN = function(x) {
-                return(est_nr(dat, x, tau = qq, rho = rh, bandwidth = bh)$q)
+                return(estimate.quantile(dat, x, tau = qq, rho = rh, bandwidth = bh)$q)   # can replace with estimate2.quantile also
             }))
         }
         

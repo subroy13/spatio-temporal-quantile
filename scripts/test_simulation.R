@@ -84,7 +84,7 @@ simulation <- function(dat, params, nsim = 100, seed = 1234, holdout = 0) {
             estimate.quantile(dat$Ydata[[id]][1:holdout_start,], 
                               dat$Xt[1:holdout_start,], 
                               params$alpha[[k]], 
-                              params$x[k, ])
+                              params$x[k, ])$q
         })
         return(x)
     }, cl = cl)
@@ -165,33 +165,3 @@ calc.RMSE(res) %>%
     mutate(OUT = paste0(round(RMSE,3), " (", round(MAPE, 3), ")")) %>%
     pivot_wider(id_cols = "alpha", names_from = "time", values_from = "OUT") %>%
     xtable::xtable()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
