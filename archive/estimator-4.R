@@ -26,7 +26,7 @@ true.quantile <- function(Ydata, Xt, alpha = 0.5, x = colMedians(Xt), method = "
 
 
 # Estimator of the quantile
-estimate.quantile <- function(Y, Xt, Z = NULL, quant = 0.5, x = colMedians(Xt), maxiter = 1, tol = 1e-5) {
+estimate.quantile <- function(Y, Xt, Z = NULL, quant = 0.5, x = colMedians(Xt), maxiter = 1000, tol = 1e-5) {
     
     ntime <- nrow(Y)
     nloc <- ncol(Y)
