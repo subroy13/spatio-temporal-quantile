@@ -42,6 +42,8 @@ estimate.quantile <- function(Y, Xt, Z = NULL, quant = 0.5, x = colMedians(Xt), 
   beta <- 1.5 * alpha - 1
   nbn <- ntime^(-beta)
   
+  eps <- 1e-10  # tolerance level for matrix inversion and conditioning
+  
   # get distance matrix based on available info about locations
   if (is.null(Z)) {
     distmat <- NULL
@@ -50,10 +52,11 @@ estimate.quantile <- function(Y, Xt, Z = NULL, quant = 0.5, x = colMedians(Xt), 
   }
 
   # calculate the kernal values for all Xt
-  kern.array = lapply(c(1:ntime), FUN = function(j) kern(Xt[j,], x, nloc, distmat))
+  kern.array <- lapply(c(1:ntime), FUN = function(j) kern(Xt[j,], x, nloc, distmat))
+  kern.norm <- unlist(lapply(kern.array, FUN = function(x1) norm(x1)))
   
   # find the closest x-index for every observation
-  best.index <- which.max(unlist(lapply(kern.array, FUN = function(x1) norm(x1))))
+  best.index <- which.max(kern.norm)
   
   # initialization of the algorithm
   init.u <- ntime + runif(nloc)
@@ -68,7 +71,7 @@ estimate.quantile <- function(Y, Xt, Z = NULL, quant = 0.5, x = colMedians(Xt), 
   q <- runif(nloc)
   
   # calculations that are needed several times
-  idx = which(abs(c(1:ntime) - best.index) < nbn)  # apply the kernel to the support specified by the bandwidth
+  idx = which((abs(1:ntime - best.index) < nbn) & (kern.norm > eps))  # apply the kernel to the support specified by the bandwidth
   kmats = kern.array[idx]
   Ymat = Y[idx,]
   mean.calc = lapply(1:length(idx),FUN = function(x1) (kmats[[x1]] %*% Ymat[x1,]))
@@ -77,8 +80,7 @@ estimate.quantile <- function(Y, Xt, Z = NULL, quant = 0.5, x = colMedians(Xt), 
   wmat = Reduce('+', kmats)
   add.mean = Reduce('+', mean.calc)
   add.var = Reduce('+', var.calc)
-  eps <- 1e-10
-  wmat.inv <- solve(wmat + 1e-10*diag(nloc))
+  wmat.inv <- solve(wmat + eps*diag(nloc))
   
   # run the algorithm until convergence
   while (!converged) {
@@ -125,8 +127,9 @@ estimate.sigma <- function(Y, Xt, Z = NULL, x = colMedians(Xt)) {
     distmat <- as.matrix(dist(Z))
   }
   kern.array = lapply(c(1:ntime), FUN = function(j) kern(Xt[j,], x, nloc, distmat))
-  best.index <- which.max(unlist(lapply(kern.array, FUN = function(x1) norm(x1))))
-  idx = which(abs(1:ntime - best.index) < nbn)  # apply the kernel to the support specified by the bandwidth
+  kern.norm <- unlist(lapply(kern.array, FUN = function(x1) norm(x1)))
+  best.index <- which.max(kern.norm)
+  idx = which((abs(1:ntime - best.index) < nbn) & (kern.norm > eps))  # apply the kernel to the support specified by the bandwidth
   
   # estimating sigma using nonparametric method using kernel smoothing
   var.calc <- lapply(1:length(idx),FUN = function(i) (kern.array[[idx[i]]] %*% tcrossprod(Y[idx[i],])) )
@@ -151,15 +154,17 @@ eta_t <- function(q0, Y, Xt, Z = NULL, x = colMedians(Xt), normalize = TRUE) {
   alpha <- log(nloc) / log(ntime)  
   beta <- 1.5 * alpha - 1
   nbn <- ntime^(-beta)
+  eps <- 1e-10
   
   if (is.null(Z)) {
     distmat <- NULL
   } else {
     distmat <- as.matrix(dist(Z))
   }
-  kern.array = lapply(c(1:ntime), FUN = function(j) kern(Xt[j,], x, nloc, distmat))
-  best.index <- which.max(unlist(lapply(kern.array, FUN = function(x1) norm(x1))))
-  idx = which(abs(1:ntime - best.index) < nbn)  # apply the kernel to the support specified by the bandwidth
+  kern.array <- lapply(c(1:ntime), FUN = function(j) kern(Xt[j,], x, nloc, distmat))
+  kern.norm <- unlist(lapply(kern.array, FUN = function(x1) norm(x1)))
+  best.index <- which.max(kern.norm)
+  idx = which((abs(1:ntime - best.index) < nbn) & (kern.norm > eps))  # apply the kernel to the support specified by the bandwidth
   
   mu0hat <- estimate.quantile(Y, Xt, Z, 0.5, x)[["q"]]
   muhat <- t(sapply(1:length(idx), FUN = function(i) {
@@ -169,7 +174,7 @@ eta_t <- function(q0, Y, Xt, Z = NULL, x = colMedians(Xt), normalize = TRUE) {
   etavec <- t(sapply(1:length(idx), FUN = function(i) {
     mu_minus_q0 <- (mu0hat - q0)  # Simply (mu_0 - q_0)
     eta <- kern.array[[idx[i]]] %*% (muhat[i, ] - q0)  # eta(t_i) as in Eq. (12)
-    return(mu_minus_q0/inner.norm(mu_minus_q0) - eta/inner.norm(eta))
+    return(normalize.vec(mu_minus_q0) - normalize.vec(eta))
   }))  # each row corresponds to a timepoint
   
   term.calc = lapply(1:length(idx),FUN = function(i) (kern.array[[idx[i]]] %*% etavec[i,] ))
@@ -195,6 +200,7 @@ Psi_t <- function(q0, Y, Xt, Z = NULL, x = colMedians(Xt), normalize = TRUE) {
   alpha <- log(nloc) / log(ntime)  
   beta <- 1.5 * alpha - 1
   nbn <- ntime^(-beta)
+  eps <- 1e-10
   
   if (is.null(Z)) {
     distmat <- NULL
@@ -202,8 +208,9 @@ Psi_t <- function(q0, Y, Xt, Z = NULL, x = colMedians(Xt), normalize = TRUE) {
     distmat <- as.matrix(dist(Z))
   }
   kern.array = lapply(c(1:ntime), FUN = function(j) kern(Xt[j,], x, nloc, distmat))
-  best.index <- which.max(unlist(lapply(kern.array, FUN = function(x1) norm(x1))))
-  idx = which(abs(1:ntime - best.index) < nbn)  # apply the kernel to the support specified by the bandwidth
+  kern.norm <- unlist(lapply(kern.array, FUN = function(x1) norm(x1)))
+  best.index <- which.max(kern.norm)
+  idx = which((abs(1:ntime - best.index) < nbn) & (kern.norm > eps))  # apply the kernel to the support specified by the bandwidth
   
   # obtaining the eta(t_i) values as in Eq. (12)
   muhat <- t(sapply(1:length(idx), FUN = function(i) {
@@ -214,7 +221,11 @@ Psi_t <- function(q0, Y, Xt, Z = NULL, x = colMedians(Xt), normalize = TRUE) {
   # creating V_2(t_i) values as in Eq. (14)
   v2 <- lapply(1:length(idx), FUN = function(i) {
     etanorm <- inner.norm(eta[i, ])  # norm value || eta(t_i) ||
-    return((diag(nloc) - outer(eta[i, ], eta[i, ])/ etanorm^2)/etanorm)
+    if (etanorm > eps) {
+      return((diag(nloc) - outer(eta[i, ], eta[i, ])/ etanorm^2)/etanorm)
+    } else {
+      return((diag(nloc) -  matrix(1/nloc, nrow = nloc, ncol = nloc)))  # handle very small eta values
+    }
   })
   term.calc <- lapply(1:length(idx),FUN = function(i) (kern.array[[idx[i]]] %*% v2[[i]] %*% kern.array[[idx[i]]] ))
   if (normalize) {
@@ -247,8 +258,9 @@ Omega_t <- function(q0, Y, Xt, Z = NULL, x = colMedians(Xt), normalize = TRUE) {
     distmat <- as.matrix(dist(Z))
   }
   kern.array = lapply(c(1:ntime), FUN = function(j) kern(Xt[j,], x, nloc, distmat))
-  best.index <- which.max(unlist(lapply(kern.array, FUN = function(x1) norm(x1))))
-  idx = which(abs(1:ntime - best.index) < nbn)  # apply the kernel to the support specified by the bandwidth
+  kern.norm <- unlist(lapply(kern.array, FUN = function(x1) norm(x1)))
+  best.index <- which.max(kern.norm)
+  idx = which((abs(1:ntime - best.index) < nbn) & (kern.norm > eps))  # apply the kernel to the support specified by the bandwidth
   
   # obtaining the eta(t_i) values as in Eq. (12)
   muhat <- t(sapply(1:length(idx), FUN = function(i) {
@@ -259,7 +271,11 @@ Omega_t <- function(q0, Y, Xt, Z = NULL, x = colMedians(Xt), normalize = TRUE) {
   # creating V_2(t_i) values as in Eq. (14)
   v2 <- lapply(1:length(idx), FUN = function(i) {
     etanorm <- inner.norm(eta[i, ])  # norm value || eta(t_i) ||
-    return((diag(nloc) - outer(eta[i, ], eta[i, ])/ etanorm^2)/etanorm)
+    if (etanorm > eps) {
+      return((diag(nloc) - outer(eta[i, ], eta[i, ])/ etanorm^2)/etanorm)
+    } else {
+      return((diag(nloc) -  matrix(1/nloc, nrow = nloc, ncol = nloc)))  # handle very small eta values
+    }
   })
   KV2K <- lapply(1:length(idx),FUN = function(i) (kern.array[[idx[i]]] %*% v2[[i]] %*% kern.array[[idx[i]]] ))
   
