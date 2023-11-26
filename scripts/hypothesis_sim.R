@@ -59,9 +59,9 @@ for (i in 1:nrow(df)) {
     X <- (1:n)/n  # x-covariate
     U <- runif(n)
     Y.true <- matrix(NA, nrow = n, ncol = p)
-    for (i in 1:n) {
-        tau <- 2 * U[i] - 1
-        Y.true[i, ] <- X[i] * c(tau, -tau, tau^2 - tau)
+    for (j in 1:n) {
+        tau <- 2 * U[j] - 1
+        Y.true[j, ] <- X[j] * c(tau, -tau, tau^2 - tau)
     }
     err <- matrix(rnorm(n * p), nrow = n, ncol = p)
     Y <- Y.true + sigma.err * err
